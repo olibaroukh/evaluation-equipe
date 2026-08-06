@@ -347,9 +347,9 @@ async function loadMagasins() {
 
 function parseCSV(text) {
   const lines = text.trim().split(/\r?\n/);
-  const headers = lines[0].split(',').map(h => h.trim());
+  const headers = lines[0].split(';').map(h => h.trim());
   return lines.slice(1).filter(Boolean).map(line => {
-    const cols = line.split(',');
+    const cols = line.split(';');
     const obj = {};
     headers.forEach((h, i) => obj[h] = (cols[i] || '').trim());
     return obj;
