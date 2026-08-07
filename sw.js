@@ -1,6 +1,6 @@
 // Évaluation Équipe — Service Worker
 // Convention : SW_VERSION bumpée en même temps que APP_VERSION dans index.html
-const SW_VERSION = '2026.08.07-7';
+const SW_VERSION = '2026.08.07-8';
 const CACHE_NAME = 'eval-equipe-' + SW_VERSION;
 
 self.addEventListener('install', (event) => {
