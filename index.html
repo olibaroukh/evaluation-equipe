@@ -33,6 +33,7 @@
   .brand{ display:flex; align-items:center; gap:10px; margin-bottom:2px; }
   .brand img{ height:26px; width:auto; mix-blend-mode:screen; flex:none; }
   .brand .name{ font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+  .logout-btn{ margin-left:auto; background:none; border:none; color:var(--muted); font-family:'Barlow'; font-size:11px; font-weight:600; text-decoration:underline; cursor:pointer; padding:0; }
   h1.screen-title{ font-family:'Barlow Condensed'; font-weight:700; font-size:26px; margin:6px 0 0; }
   .screen-sub{ font-size:13px; color:var(--muted); margin-top:3px; }
   .back-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
@@ -164,7 +165,7 @@
 
   <header>
     <div id="hdr-list">
-      <div class="brand"><img class="app-logo" alt="OC"><div class="name" id="hdr-session-label">—</div></div>
+      <div class="brand"><img class="app-logo" alt="OC"><div class="name" id="hdr-session-label">—</div><button class="logout-btn" onclick="logout()">Déconnexion</button></div>
       <h1 class="screen-title">Évaluation Équipe</h1>
       <div class="screen-sub" id="hdr-list-sub">Chargement…</div>
     </div>
@@ -205,15 +206,16 @@
         </div>
       </div>
       <div class="legend-box">Coche chaque critère validé lors du contrôle. La note correspond au nombre de critères respectés. <b>Seules les 3 meilleures notes de l'année</b> compteront dans la moyenne annuelle de cette tâche.</div>
-      <div id="control-history"></div>
       <div class="section-label">Les 10 critères</div>
       <div id="criteria-list"></div>
+      <div id="control-history"></div>
       <div style="height:150px;"></div>
     </section>
 
     <!-- SCREEN: RESPONSABLES -->
     <section class="screen" id="screen-resp">
       <div class="section-label">Choisir un magasin</div>
+      <input class="search" id="resp-store-search" placeholder="Rechercher un magasin…" oninput="populateRespSelect(this.value)">
       <select class="search" id="resp-store-select" onchange="respStoreChange(this.value)"></select>
       <div class="empty-state" id="resp-empty">👤 Sélectionne un magasin ci-dessus pour voir et modifier ses fiches responsables.</div>
       <div id="resp-content" style="display:none;"></div>
@@ -250,6 +252,7 @@ const OC_LOGO_B64 = 'iVBORw0KGgoAAAANSUhEUgAABSQAAAOMCAIAAADbkiqTAAAAAXNSR0IArs4
 let magasins = [];      // [{code, libelle, animateur, animateur_email}, ...]
 let arSession = null;   // {token, ar, exp}
 let currentStoreCode = null;
+let currentRespStoreCode = null;
 let currentTache = null;
 let currentTaskCriteres = [];
 let currentTaskDejaVus = new Set();
@@ -348,6 +351,9 @@ async function loadMagasins() {
   if (!magasins.length) {
     try { magasins = JSON.parse(localStorage.getItem('eval_magasins_cache') || '[]'); } catch (e) {}
   }
+  // Filtre les lignes incomplètes (fin de fichier, séparateurs mal parsés) —
+  // un magasin sans code ni libellé n'est pas exploitable dans l'app.
+  magasins = magasins.filter(m => m.code && m.libelle);
   document.getElementById('hdr-list-sub').textContent = magasins.length
     ? magasins.length + ' magasins · Objectif niveau équipe : 8/10'
     : 'Référentiel indisponible';
@@ -667,17 +673,30 @@ async function saveControl() {
 
 // ---- Écran : responsables ---------------------------------------------
 
-function populateRespSelect() {
+function populateRespSelect(filterText) {
   const sel = document.getElementById('resp-store-select');
-  const stores = mesMagasins();
+  const search = (filterText || '').toLowerCase();
+  const stores = mesMagasins().filter(m => !search || m.libelle.toLowerCase().includes(search));
+  const previousValue = sel.value;
   sel.innerHTML = '<option value="">— Sélectionner un magasin —</option>' +
     stores.map(m => `<option value="${m.code}">${m.libelle}</option>`).join('');
+  // Conserve la sélection en cours si elle correspond toujours au filtre appliqué
+  if (stores.some(m => m.code === previousValue)) sel.value = previousValue;
 }
 
 async function respStoreChange(code) {
+  currentRespStoreCode = code || null;
   const empty = document.getElementById('resp-empty');
   const content = document.getElementById('resp-content');
-  if (!code) { empty.style.display = 'block'; content.style.display = 'none'; return; }
+  if (!code) {
+    empty.style.display = 'block'; content.style.display = 'none';
+    document.getElementById('hdr-store-name').textContent = 'Responsables';
+    document.getElementById('hdr-store-region').textContent = '';
+    return;
+  }
+  const m = magasins.find(x => x.code === code);
+  document.getElementById('hdr-store-name').textContent = m ? m.libelle : code;
+  document.getElementById('hdr-store-region').textContent = m ? (m.animateur || '') : '';
   empty.style.display = 'none';
   content.style.display = 'block';
   content.innerHTML = 'Chargement…';
@@ -737,6 +756,11 @@ function goTo(id) {
   if (id === 'screen-list') document.getElementById('hdr-list').style.display = 'block';
   if (id === 'screen-store' || id === 'screen-resp') document.getElementById('hdr-detail').style.display = 'block';
   if (id === 'screen-control') document.getElementById('hdr-control').style.display = 'block';
+
+  if (id === 'screen-resp' && !currentRespStoreCode) {
+    document.getElementById('hdr-store-name').textContent = 'Responsables';
+    document.getElementById('hdr-store-region').textContent = '';
+  }
 
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
   const navMatch = document.querySelector(`nav button[data-nav="${id}"]`)
